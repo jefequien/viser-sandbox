@@ -17,6 +17,7 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
+    "universal-pathlib",
     "viser",
 ]
 
@@ -30,6 +31,9 @@ dev = [
 
 [project.urls]
 "GitHub" = "https://github.com/jefequien/viser-sandbox"
+
+[tool.setuptools.packages.find]
+include = ["viser_sandbox*"]
 
 [tool.mypy]
 python_version = "3.10"
