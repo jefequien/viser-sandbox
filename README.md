@@ -1,4 +1,4 @@
-![viser_sandbox](assets/viser_sandbox.png)
+![viser_sandbox](assets/viser_logo.svg)
 
 # Installation
 
@@ -37,5 +37,5 @@ pip install viser_sandbox
 ```bash
 git clone https://github.com/jefequien/viser-sandbox.git
 cd viser_sandbox
-pip install -e .
+pip install -e .'[dev]'
 ```
