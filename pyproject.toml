@@ -36,6 +36,8 @@ dev = [
 
 [project.scripts]
 sandbox-dev-checks = "viser_sandbox.scripts.dev_checks:entrypoint"
+sandbox-gui = "viser_sandbox.scripts.gui:main"
+sandbox-record3d = "viser_sandbox.scripts.record3d_visualizer:main"
 
 [tool.setuptools.packages.find]
 include = ["viser_sandbox*"]
