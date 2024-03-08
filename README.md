@@ -1,4 +1,4 @@
-![viser_sandbox](assets/viser_sandbox.jpg)
+![viser_sandbox](assets/viser_sandbox.png)
 
 # Installation
 
