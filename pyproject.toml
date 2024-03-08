@@ -17,6 +17,8 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
+    "rich",
+    "tyro",
     "universal-pathlib",
     "viser",
 ]
@@ -32,6 +34,9 @@ dev = [
 [project.urls]
 "GitHub" = "https://github.com/jefequien/viser-sandbox"
 
+[project.scripts]
+sandbox-dev-checks = "viser_sandbox.scripts.dev_checks:entrypoint"
+
 [tool.setuptools.packages.find]
 include = ["viser_sandbox*"]
 
@@ -42,7 +47,17 @@ warn_unused_configs = true
 disable_error_code="var-annotated"  # Common source of mypy + numpy false positives.
 
 [tool.pyright]
-exclude = ["./docs/**/*"]
+include = ["viser_sandbox"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+]
+defineConstant = { DEBUG = true }
+reportMissingImports = false
+reportMissingTypeStubs = false
+reportPrivateImportUsage = false
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
 
 [tool.ruff]
 select = [
