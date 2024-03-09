@@ -23,17 +23,11 @@ Install PyTorch with CUDA (this repo has been tested with CUDA 12.1).
 pip install torch==2.2.1 torchvision==0.17.1 torchaudio==2.2.1 --index-url https://download.pytorch.org/whl/cu121
 ```
 
+## Installation
 
-### Installing viser_sandbox
+The current recommended way to install viser_sandbox is from source.
 
-Install from pip
-
-```bash
-pip install viser_sandbox
-```
-
-**OR** install from source.
-
+### From source
 ```bash
 git clone https://github.com/jefequien/viser-sandbox.git
 cd viser_sandbox
