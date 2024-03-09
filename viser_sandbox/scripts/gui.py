@@ -1,82 +1,54 @@
-"""RealSense visualizer
+"""Camera Visualizer
 
 Connect to a RealSense camera, then visualize RGB-D readings as a point clouds. Requires
 pyrealsense2.
 """
-import time
 
+import cv2
 import numpy as np
+import onnxruntime as ort
 import viser
+from PIL import Image
+from tqdm import tqdm
 
 from viser_sandbox.util.projection import backproject_depth
-
-# def point_cloud_arrays_from_frames(
-#     depth_frame, color_frame
-# ) -> Tuple[npt.NDArray[np.float32], npt.NDArray[np.uint8]]:
-#     """Maps realsense frames to two arrays.
-
-#     Returns:
-#     - A point position array: (N, 3) float32.
-#     - A point color array: (N, 3) uint8.
-#     """
-#     # Processing blocks. Could be tuned.
-#     point_cloud = rs.pointcloud()  # type: ignore
-#     decimate = rs.decimation_filter()  # type: ignore
-#     decimate.set_option(rs.option.filter_magnitude, 3)  # type: ignore
-
-#     # Downsample depth frame.
-#     depth_frame = decimate.process(depth_frame)
-
-#     # Map texture and calculate points from frames. Uses frame intrinsics.
-#     point_cloud.map_to(color_frame)
-#     points = point_cloud.calculate(depth_frame)
-
-#     # Get color coordinates.
-#     texture_uv = (
-#         np.asanyarray(points.get_texture_coordinates())
-#         .view(np.float32)
-#         .reshape((-1, 2))
-#     )
-#     color_image = np.asanyarray(color_frame.get_data())
-#     color_h, color_w, _ = color_image.shape
-
-#     # Note: for points that aren't in the view of our RGB camera, we currently clamp to
-#     # the closes available RGB pixel. We could also just remove these points.
-#     texture_uv = texture_uv.clip(0.0, 1.0)
-
-#     # Get positions and colors.
-#     positions = np.asanyarray(points.get_vertices()).view(np.float32)
-#     positions = positions.reshape((-1, 3))
-#     colors = color_image[
-#         (texture_uv[:, 1] * (color_h - 1.0)).astype(np.int32),
-#         (texture_uv[:, 0] * (color_w - 1.0)).astype(np.int32),
-#         :,
-#     ]
-#     N = positions.shape[0]
-
-#     assert positions.shape == (N, 3)
-#     assert positions.dtype == np.float32
-#     assert colors.shape == (N, 3)
-#     assert colors.dtype == np.uint8
-
-#     return positions, colors
+from viser_sandbox.util.transform import transform
 
 
 def main():
     # Start visualization server.
     viser_server = viser.ViserServer()
+    # define a video capture object
+    vid = cv2.VideoCapture(0)
+    size = (640, 480)
 
-    while True:
-        # Wait for a coherent pair of frames: depth and color
-        # frames = pipeline.wait_for_frames()
-        # depth_frame = frames.get_depth_frame()
-        # color_frame = frames.get_color_frame()
-        K = np.array([[0.5, 0.0, 0.5], [0.0, 1.0, 0.5], [0.0, 0.0, 1.0]])
+    model_path = "../Depth-Anything-ONNX/weights/depth_anything_vits14.onnx"
+    session = ort.InferenceSession(
+        model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+    )
+    # pipe = pipeline(task="depth-estimation", model="LiheYoung/depth-anything-small-hf")
 
-        color = (np.random.rand(60, 120, 3) * 255).astype(np.uint8)
-        depth = np.ones((60, 120), dtype=np.float32) * 10.0
+    for _ in tqdm(range(10000000)):
+        ret, frame = vid.read()
+        if not ret:
+            break
+
+        image = Image.fromarray(frame[:, :, ::-1]).resize(size)
+        # disp = np.array(pipe(image)["depth"])
+        # disp = (disp.astype(np.float32) + 1) / 256
+        # depth = 0.5 * (1 / disp) + 1
+        image = np.array(image)
+
+        image_inp = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0
+        image_inp = transform({"image": image_inp})["image"]  # C, H, W
+        image_inp = image_inp[None]  # B, C, H, W
+        disp = session.run(None, {"image": image_inp})[0]
+        disp = cv2.resize(disp[0, 0], size) + 1e-6
+        depth = 10 * (1 / disp) + 4
+
+        K = np.array([[0.5, 0.0, 0.5], [0.0, 0.667, 0.5], [0.0, 0.0, 1.0]])
         points = backproject_depth(depth, K)
-        colors = color.reshape((-1, 3))
+        colors = image.reshape((-1, 3))
 
         # Place point cloud.
         viser_server.add_point_cloud(
@@ -87,7 +59,7 @@ def main():
         )
 
         # Place the frustum.
-        h, w = depth.shape[:2]
+        w, h = size
         fov = 2 * np.arctan2(h / 2, K[1, 1] * h)
         aspect = w / h
         viser_server.add_camera_frustum(
@@ -95,7 +67,7 @@ def main():
             fov=fov,
             aspect=aspect,
             scale=0.15,
-            image=color,
+            image=image,
             wxyz=np.array([1.0, 0.0, 0.0, 0.0]),
             position=np.zeros(3),
         )
@@ -106,8 +78,6 @@ def main():
             axes_length=0.05,
             axes_radius=0.005,
         )
-
-        time.sleep(0.2)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,12 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
+    "onnxruntime",
+    "opencv-python",
     "rich",
+    "torch",
+    "torchvision",
+    "transformers",
     "tyro",
     "universal-pathlib",
     "viser",
