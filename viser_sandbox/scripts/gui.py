@@ -6,13 +6,11 @@ pyrealsense2.
 
 import cv2
 import numpy as np
-import onnxruntime as ort
 import viser
 from PIL import Image
 from tqdm import tqdm
 
 from viser_sandbox.util.projection import backproject_depth
-from viser_sandbox.util.transform import transform
 
 
 def main():
@@ -21,12 +19,12 @@ def main():
     # define a video capture object
     vid = cv2.VideoCapture(0)
     size = (640, 480)
+    w, h = size
 
-    model_path = "../Depth-Anything-ONNX/weights/depth_anything_vits14.onnx"
-    session = ort.InferenceSession(
-        model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
-    )
-    # pipe = pipeline(task="depth-estimation", model="LiheYoung/depth-anything-small-hf")
+    # model_path = "../Depth-Anything-ONNX/weights/depth_anything_vits14.onnx"
+    # session = ort.InferenceSession(
+    #     model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+    # )
 
     for _ in tqdm(range(10000000)):
         ret, frame = vid.read()
@@ -34,17 +32,15 @@ def main():
             break
 
         image = Image.fromarray(frame[:, :, ::-1]).resize(size)
-        # disp = np.array(pipe(image)["depth"])
-        # disp = (disp.astype(np.float32) + 1) / 256
-        # depth = 0.5 * (1 / disp) + 1
         image = np.array(image)
 
-        image_inp = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0
-        image_inp = transform({"image": image_inp})["image"]  # C, H, W
-        image_inp = image_inp[None]  # B, C, H, W
-        disp = session.run(None, {"image": image_inp})[0]
-        disp = cv2.resize(disp[0, 0], size) + 1e-6
-        depth = 10 * (1 / disp) + 4
+        # image_inp = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0
+        # image_inp = transform({"image": image_inp})["image"]  # C, H, W
+        # image_inp = image_inp[None]  # B, C, H, W
+        # disp = session.run(None, {"image": image_inp})[0]
+        # disp = cv2.resize(disp[0, 0], size) + 1e-6
+        # depth = 10 * (1 / disp) + 4
+        depth = np.ones((h, w)) * 10.0
 
         K = np.array([[0.5, 0.0, 0.5], [0.0, 0.667, 0.5], [0.0, 0.0, 1.0]])
         points = backproject_depth(depth, K)
@@ -59,7 +55,6 @@ def main():
         )
 
         # Place the frustum.
-        w, h = size
         fov = 2 * np.arctan2(h / 2, K[1, 1] * h)
         aspect = w / h
         viser_server.add_camera_frustum(
