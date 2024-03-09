@@ -1,121 +1,113 @@
-# mypy: disable-error-code="assignment"
-#
-# Asymmetric properties are supported in Pyright, but not yet in mypy.
-# - https://github.com/python/mypy/issues/3004
-# - https://github.com/python/mypy/pull/11643
-"""GUI basics
+"""RealSense visualizer
 
-Examples of basic GUI elements that we can create, read from, and write to."""
-
+Connect to a RealSense camera, then visualize RGB-D readings as a point clouds. Requires
+pyrealsense2.
+"""
 import time
 
-import numpy as onp
+import numpy as np
 import viser
 
+from viser_sandbox.util.projection import backproject_depth
 
-def main() -> None:
-    server = viser.ViserServer()
+# def point_cloud_arrays_from_frames(
+#     depth_frame, color_frame
+# ) -> Tuple[npt.NDArray[np.float32], npt.NDArray[np.uint8]]:
+#     """Maps realsense frames to two arrays.
 
-    # Add some common GUI elements: number inputs, sliders, vectors, checkboxes.
-    with server.add_gui_folder("Read-only"):
-        gui_counter = server.add_gui_number(
-            "Counter",
-            initial_value=0,
-            disabled=True,
-        )
+#     Returns:
+#     - A point position array: (N, 3) float32.
+#     - A point color array: (N, 3) uint8.
+#     """
+#     # Processing blocks. Could be tuned.
+#     point_cloud = rs.pointcloud()  # type: ignore
+#     decimate = rs.decimation_filter()  # type: ignore
+#     decimate.set_option(rs.option.filter_magnitude, 3)  # type: ignore
 
-        gui_slider = server.add_gui_slider(
-            "Slider",
-            min=0,
-            max=100,
-            step=1,
-            initial_value=0,
-            disabled=True,
-        )
+#     # Downsample depth frame.
+#     depth_frame = decimate.process(depth_frame)
 
-    with server.add_gui_folder("Editable"):
-        gui_vector2 = server.add_gui_vector2(
-            "Position",
-            initial_value=(0.0, 0.0),
-            step=0.1,
-        )
-        gui_vector3 = server.add_gui_vector3(
-            "Size",
-            initial_value=(1.0, 1.0, 1.0),
-            step=0.25,
-        )
-        with server.add_gui_folder("Text toggle"):
-            gui_checkbox_hide = server.add_gui_checkbox(
-                "Hide",
-                initial_value=False,
-            )
-            gui_text = server.add_gui_text(
-                "Text",
-                initial_value="Hello world",
-            )
-            gui_button = server.add_gui_button("Button")
-            gui_checkbox_disable = server.add_gui_checkbox(
-                "Disable",
-                initial_value=False,
-            )
-            gui_rgb = server.add_gui_rgb(
-                "Color",
-                initial_value=(255, 255, 0),
-            )
-            gui_multi_slider = server.add_gui_multi_slider(
-                "Multi slider",
-                min=0,
-                max=100,
-                step=1,
-                initial_value=(0, 30, 100),
-            )
-            gui_slider_positions = server.add_gui_slider(
-                "# sliders",
-                min=0,
-                max=10,
-                step=1,
-                initial_value=3,
-                marks=((0, "0"), (5, "5"), (7, "7"), 10),
-            )
+#     # Map texture and calculate points from frames. Uses frame intrinsics.
+#     point_cloud.map_to(color_frame)
+#     points = point_cloud.calculate(depth_frame)
 
-    # Pre-generate a point cloud to send.
-    point_positions = onp.random.uniform(low=-1.0, high=1.0, size=(5000, 3))
-    color_coeffs = onp.random.uniform(0.4, 1.0, size=(point_positions.shape[0]))
+#     # Get color coordinates.
+#     texture_uv = (
+#         np.asanyarray(points.get_texture_coordinates())
+#         .view(np.float32)
+#         .reshape((-1, 2))
+#     )
+#     color_image = np.asanyarray(color_frame.get_data())
+#     color_h, color_w, _ = color_image.shape
 
-    counter = 0
+#     # Note: for points that aren't in the view of our RGB camera, we currently clamp to
+#     # the closes available RGB pixel. We could also just remove these points.
+#     texture_uv = texture_uv.clip(0.0, 1.0)
+
+#     # Get positions and colors.
+#     positions = np.asanyarray(points.get_vertices()).view(np.float32)
+#     positions = positions.reshape((-1, 3))
+#     colors = color_image[
+#         (texture_uv[:, 1] * (color_h - 1.0)).astype(np.int32),
+#         (texture_uv[:, 0] * (color_w - 1.0)).astype(np.int32),
+#         :,
+#     ]
+#     N = positions.shape[0]
+
+#     assert positions.shape == (N, 3)
+#     assert positions.dtype == np.float32
+#     assert colors.shape == (N, 3)
+#     assert colors.dtype == np.uint8
+
+#     return positions, colors
+
+
+def main():
+    # Start visualization server.
+    viser_server = viser.ViserServer()
+
     while True:
-        # We can set the value of an input to a particular value. Changes are
-        # automatically reflected in connected clients.
-        gui_counter.value = counter
-        gui_slider.value = counter % 100
+        # Wait for a coherent pair of frames: depth and color
+        # frames = pipeline.wait_for_frames()
+        # depth_frame = frames.get_depth_frame()
+        # color_frame = frames.get_color_frame()
+        K = np.array([[0.5, 0.0, 0.5], [0.0, 1.0, 0.5], [0.0, 0.0, 1.0]])
 
-        # We can set the position of a scene node with `.position`, and read the value
-        # of a gui element with `.value`. Changes are automatically reflected in
-        # connected clients.
-        server.add_point_cloud(
-            "/point_cloud",
-            points=point_positions * onp.array(gui_vector3.value, dtype=onp.float32),
-            colors=(
-                onp.tile(gui_rgb.value, point_positions.shape[0]).reshape((-1, 3))
-                * color_coeffs[:, None]
-            ).astype(onp.uint8),
-            position=gui_vector2.value + (0,),
-            point_shape="circle",
+        color = (np.random.rand(60, 120, 3) * 255).astype(np.uint8)
+        depth = np.ones((60, 120), dtype=np.float32) * 10.0
+        points = backproject_depth(depth, K)
+        colors = color.reshape((-1, 3))
+
+        # Place point cloud.
+        viser_server.add_point_cloud(
+            "/points_main",
+            points=points,
+            colors=colors,
+            point_size=0.1,
         )
 
-        # We can use `.visible` and `.disabled` to toggle GUI elements.
-        gui_text.visible = not gui_checkbox_hide.value
-        gui_button.visible = not gui_checkbox_hide.value
-        gui_rgb.disabled = gui_checkbox_disable.value
+        # Place the frustum.
+        h, w = depth.shape[:2]
+        fov = 2 * np.arctan2(h / 2, K[1, 1] * h)
+        aspect = w / h
+        viser_server.add_camera_frustum(
+            "/frames/t0/frustum",
+            fov=fov,
+            aspect=aspect,
+            scale=0.15,
+            image=color,
+            wxyz=np.array([1.0, 0.0, 0.0, 0.0]),
+            position=np.zeros(3),
+        )
 
-        # Update the number of handles in the multi-slider.
-        if gui_slider_positions.value != len(gui_multi_slider.value):
-            gui_multi_slider.value = onp.linspace(
-                0, 100, gui_slider_positions.value, dtype=onp.int64
-            )
+        # Add some axes.
+        viser_server.add_frame(
+            "/frames/t0/frustum/axes",
+            axes_length=0.05,
+            axes_radius=0.005,
+        )
 
-        counter += 1
-        time.sleep(0.01)
+        time.sleep(0.2)
 
 
 if __name__ == "__main__":

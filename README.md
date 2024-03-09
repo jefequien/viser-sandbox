@@ -1,4 +1,4 @@
-![viser_sandbox](assets/viser_logo.svg)
+![viser_sandbox](docs/viser_logo.svg)
 
 # Installation
 
