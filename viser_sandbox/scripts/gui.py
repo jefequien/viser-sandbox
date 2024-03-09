@@ -12,7 +12,8 @@ from viser.theme import TitlebarButton, TitlebarConfig, TitlebarImage
 
 from viser_sandbox.env import ROOT_DIR
 from viser_sandbox.util.projection import backproject_depth
-from viser_sandbox.yolov8 import YOLOv8
+from viser_sandbox.util.video_capture import VideoCapture
+from viser_sandbox.yolov8.yolov8 import YOLOv8
 
 
 def main():
@@ -52,16 +53,14 @@ def main():
     server.add_gui_markdown(content=markdown_source)
 
     # define a video capture object
-    vid = cv2.VideoCapture("rtsp://localhost:8554/cam")
+    vid = VideoCapture("rtsp://localhost:8554/cam")
     K = np.array([[0.5, 0.0, 0.5], [0.0, 0.667, 0.5], [0.0, 0.0, 1.0]])
     max_width = 80
     model_path = "./yolov8n.onnx"
     yolov8_detector = YOLOv8(model_path, conf_thres=0.5, iou_thres=0.5)
 
     for _ in tqdm(range(10000000)):
-        ret, frame = vid.read()
-        if not ret:
-            break
+        frame = vid.read()
 
         # Update object localizer
         boxes, scores, class_ids = yolov8_detector(frame)
