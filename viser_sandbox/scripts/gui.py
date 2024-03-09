@@ -7,57 +7,88 @@ pyrealsense2.
 import cv2
 import numpy as np
 import viser
-from PIL import Image
 from tqdm import tqdm
+from viser.theme import TitlebarButton, TitlebarConfig, TitlebarImage
 
+from viser_sandbox.env import ROOT_DIR
 from viser_sandbox.util.projection import backproject_depth
+from viser_sandbox.yolov8 import YOLOv8
 
 
 def main():
     # Start visualization server.
-    viser_server = viser.ViserServer()
-    # define a video capture object
-    vid = cv2.VideoCapture(0)
-    size = (640, 480)
-    w, h = size
+    server = viser.ViserServer(label="DaBox")
+    buttons = (
+        TitlebarButton(
+            text="Github",
+            icon="GitHub",
+            href="https://github.com/jefequien/viser-sandbox",
+        ),
+        TitlebarButton(
+            text="Documentation",
+            icon="Description",
+            href="https://github.com/jefequien/viser-sandbox",
+        ),
+    )
+    image = TitlebarImage(
+        image_url_light="https://docs.nerf.studio/_static/imgs/logo.png",
+        image_url_dark="https://docs.nerf.studio/_static/imgs/logo-dark.png",
+        image_alt="DaBox Logo",
+        href="https://docs.nerf.studio/",
+    )
+    titlebar_theme = TitlebarConfig(buttons=buttons, image=image)
+    server.configure_theme(
+        titlebar_content=titlebar_theme,
+        control_layout="collapsible",
+        control_width="medium",
+        dark_mode=True,
+        show_logo=True,
+        show_share_button=False,
+        brand_color=(230, 180, 30),
+    )
+    markdown_source = (
+        ROOT_DIR / "viser_sandbox/scripts/assets/mdx_example.mdx"
+    ).read_text()
+    server.add_gui_markdown(content=markdown_source)
 
-    # model_path = "../Depth-Anything-ONNX/weights/depth_anything_vits14.onnx"
-    # session = ort.InferenceSession(
-    #     model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
-    # )
+    # define a video capture object
+    vid = cv2.VideoCapture("rtsp://localhost:8554/cam")
+    K = np.array([[0.5, 0.0, 0.5], [0.0, 0.667, 0.5], [0.0, 0.0, 1.0]])
+    max_width = 80
+    model_path = "./yolov8n.onnx"
+    yolov8_detector = YOLOv8(model_path, conf_thres=0.5, iou_thres=0.5)
 
     for _ in tqdm(range(10000000)):
         ret, frame = vid.read()
         if not ret:
             break
 
-        image = Image.fromarray(frame[:, :, ::-1]).resize(size)
-        image = np.array(image)
+        # Update object localizer
+        boxes, scores, class_ids = yolov8_detector(frame)
+        frame = yolov8_detector.draw_detections(frame)
 
-        # image_inp = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0
-        # image_inp = transform({"image": image_inp})["image"]  # C, H, W
-        # image_inp = image_inp[None]  # B, C, H, W
-        # disp = session.run(None, {"image": image_inp})[0]
-        # disp = cv2.resize(disp[0, 0], size) + 1e-6
-        # depth = 10 * (1 / disp) + 4
-        depth = np.ones((h, w)) * 10.0
+        image = frame[:, :, ::-1]
+        h_ori, w_ori = image.shape[:2]
+        w = min(w_ori, max_width)
+        h = int(w * (h_ori / w_ori))
 
-        K = np.array([[0.5, 0.0, 0.5], [0.0, 0.667, 0.5], [0.0, 0.0, 1.0]])
+        colors = cv2.resize(image, (w, h), cv2.INTER_LINEAR)
+        depth = np.ones(colors.shape[:2]) * 10.0
         points = backproject_depth(depth, K)
-        colors = image.reshape((-1, 3))
+        colors = colors.reshape((-1, 3))
 
         # Place point cloud.
-        viser_server.add_point_cloud(
+        server.add_point_cloud(
             "/points_main",
-            points=points,
-            colors=colors,
+            points=points.astype(np.float16),
+            colors=colors.astype(np.uint8),
             point_size=0.1,
         )
 
         # Place the frustum.
         fov = 2 * np.arctan2(h / 2, K[1, 1] * h)
         aspect = w / h
-        viser_server.add_camera_frustum(
+        server.add_camera_frustum(
             "/frames/t0/frustum",
             fov=fov,
             aspect=aspect,
@@ -68,7 +99,7 @@ def main():
         )
 
         # Add some axes.
-        viser_server.add_frame(
+        server.add_frame(
             "/frames/t0/frustum/axes",
             axes_length=0.05,
             axes_radius=0.005,
