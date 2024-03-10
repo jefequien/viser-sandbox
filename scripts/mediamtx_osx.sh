@@ -7,7 +7,7 @@ PLATFORM="darwin_arm64"
 
 mkdir -p $INSTALL_DIR
 pushd $INSTALL_DIR
-    curl -C - -OL  https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_$PLATFORM.tar.gz
+    wget -nc https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_$PLATFORM.tar.gz
     tar -xvf mediamtx_v1.6.0_$PLATFORM.tar.gz
 popd
 
