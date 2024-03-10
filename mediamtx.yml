@@ -615,12 +615,12 @@ pathDefaults:
 # for example "~^(test1|test2)$" will match both "test1" and "test2",
 # for example "~^prefix" will match all paths that start with "prefix".
 paths:
+  # cam:
+  #   runOnInit: ffmpeg -f v4l2 -framerate 30 -video_size 640x480 -pix_fmt yuyv422 -i /dev/video0 -preset ultrafast -tune zerolatency -b:v 1M -c:v libx264 -bf 0 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH
+  #   runOnInitRestart: yes
   cam:
-    runOnInit: ffmpeg -f v4l2 -framerate 30 -video_size 640x480 -i /dev/video0 -preset ultrafast -tune zerolatency -b:v 1M -c:v libx264 -bf 0 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH
+    runOnInit: ffmpeg -f avfoundation -framerate 30 -video_size 640x480 -pix_fmt yuyv422 -i "0:0" -preset ultrafast -tune zerolatency -b:v 1M -c:v libx264 -bf 0 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH
     runOnInitRestart: yes
-  # example:
-  # my_camera:
-  #   source: rtsp://my_camera
 
   # Settings under path "all_others" are applied to all paths that
   # do not match another entry.
