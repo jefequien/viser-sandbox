@@ -22,7 +22,6 @@ dependencies = [
     "rich",
     "torch",
     "torchvision",
-    "transformers",
     "tyro",
     "ultralytics",
     "universal-pathlib",
@@ -43,6 +42,7 @@ dev = [
 [project.scripts]
 sandbox-dev-checks = "viser_sandbox.scripts.dev_checks:entrypoint"
 sandbox-gui = "viser_sandbox.scripts.gui:main"
+sandbox-export-yolov8 = "viser_sandbox.scripts.export_yolov8:main"
 
 [tool.setuptools.packages.find]
 include = ["viser_sandbox*"]
